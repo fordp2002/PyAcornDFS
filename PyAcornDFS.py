@@ -1,8 +1,11 @@
 ''' Lets make some blank unformatted DFS Disks '''
 import os
 from struct import pack_into, unpack_from
+from tkinter import Tk, Menu, Button, Label, filedialog, Y, LEFT
+from tkinter.filedialog import askopenfilename
+from tkinter.ttk import Combobox, Treeview
+from webbrowser import open_new
 
-from tkinter import filedialog
 
 def get_file(ext='ssd', title="Select file"):
     return filedialog.askopenfilename(
@@ -10,6 +13,7 @@ def get_file(ext='ssd', title="Select file"):
         title=title,
         filetypes=((f"{ext} files", f"*.{ext}"), ("all files", "*.*")),
     )
+
 
 DISK_SIZE = 256 * 10 * 80  # Sector size, Sector Count, Track Count
 
@@ -39,7 +43,7 @@ def pad_disk(filename):
             file_p.write(data)
 
 
-def extra_bits(value, bits, address=False):    
+def extra_bits(value, bits, address=False):
     ''' Return 2 bits from a byte '''
     temp = (value >> bits) & 3
     if address and (temp == 3):
@@ -83,11 +87,13 @@ def read_file_info(data, offset):
     info['exec_&'] += extra_bits(extra, 6, True) << 16
     return info
 
+
 def write_ssd(disk, data, disk_info):
     ''' Write SSD from an MMB '''
     filename = f"DIN_{disk}_{disk_info['title']}.ssd"
     with open(filename, 'wb') as file_p:
         file_p.write(data)
+
 
 def read_catalogue(data):
     ''' Read the catalogue from the disk '''
@@ -97,10 +103,13 @@ def read_catalogue(data):
     print(f"{disk_info['title']} Contains {disk_info['file_count']} file(s)")
     file_info = []
     for index in range(1, disk_info['file_count'] + 1):
-        file_info.insert(index, read_file_info(data, index * 8))        
+        file_info.insert(index, read_file_info(data, index * 8))
     for info in file_info:
-        print(f"    {info['ext']}.{info['name']} {info['lock']} {info['load_&']:08X} {info['exec_&']:08X} {info['size']:06X} {info['start']:03X}")
+        print(
+            f"    {info['ext']}.{info['name']} {info['lock']} {info['load_&']:08X} {info['exec_&']:08X} {info['size']:06X} {info['start']:03X}"
+        )
     return disk_info, file_info
+
 
 def read_disk(filename, offset=0):
     ''' Read in a DFS Disk '''
@@ -108,19 +117,73 @@ def read_disk(filename, offset=0):
         data = file_p.read(DISK_SIZE)
         read_catalogue(data)
 
+
 def read_mmb(filename):
     ''' Read an MMB file '''
     with open(filename, "rb") as file_p:
         for disk in range(256):
             file_p.seek(0x2000 + (DISK_SIZE * disk))
-            data = file_p.read(DISK_SIZE)                           # Was 0x200 now read the whole SSD in!
+            data = file_p.read(DISK_SIZE)  # Was 0x200 now read the whole SSD in!
             disk_info, _file_info = read_catalogue(data)
             if disk_info:
                 write_ssd(disk, data, disk_info)
 
-#make_disks(20)
+def NewFile():
+    print("New File!")
+def OpenFile():
+    name = askopenfilename()
+    print(name)
+def About():
+    open_new("https://github.com/fordp2002/PyAcornDFS")
+
+def gui():
+    root = Tk()
+    root.title("Acorn DFS")
+    root.geometry("1024x768")
+    #root.iconbitmap(bitmap=os.path.join(os.path.dirname(__file__), 'Owl.ico'))
+
+    menu = Menu(root)
+    root.config(menu=menu)
+    filemenu = Menu(menu)
+    menu.add_cascade(label="File", menu=filemenu)
+    filemenu.add_command(label="Open MMB", command=OpenFile)
+    filemenu.add_command(label="New MMB", command=NewFile)
+    filemenu.add_separator()
+    filemenu.add_command(label="Open SSD", command=OpenFile)
+    filemenu.add_command(label="New SSD", command=NewFile)
+    filemenu.add_separator() 
+    filemenu.add_command(label="Exit", command=root.quit)
+
+    helpmenu = Menu(menu)
+    menu.add_cascade(label="Help", menu=helpmenu)
+    helpmenu.add_command(label="About...", command=About)
+
+    tree = Treeview(root)
+    tree["columns"] = ("serial", "firmware", "gtin")
+    tree.column("#0", width=350)
+    tree.column("serial", width=100)
+    tree.column("firmware", width=70)
+    tree.column("gtin", width=120)
+    tree.heading("serial", text="Serial #")
+    tree.heading("firmware", text="Version")
+    tree.heading("gtin", text="GTIN")
+
+    #popup = Popup(root, tree)
+    #tree.bind("<Button-3>", do_popup)
+
+    #icons = get_icons()
+    #for index, info in enumerate(devices):
+    #    add_device(index, info)
+
+    tree.pack(fill=Y, side=LEFT)
+    root.mainloop()
+
+
+# make_disks(20)
 # pad_disk("ROMs1.ssd")
 # pad_disk("WatfordROMram.ssd")
-#read_disk(get_file())
-#read_mmb(get_file('mmb'))
-read_mmb('BEEB.mmb')
+# read_disk(get_file())
+# read_mmb(get_file('mmb'))
+# read_mmb('BEEB.mmb')
+
+gui()
