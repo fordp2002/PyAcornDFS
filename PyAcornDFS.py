@@ -1,20 +1,8 @@
-''' Lets make some blank unformatted DFS Disks '''
+''' Acorn DFS, library and GUI by Simon R. Ellwood '''
 import os
 from struct import pack_into, unpack_from
-from tkinter import Tk, Menu, Button, Label, filedialog, Y, LEFT
-from tkinter.filedialog import askopenfilename
-from tkinter.ttk import Combobox, Treeview
-from webbrowser import open_new
 
-
-def get_file(ext='ssd', title="Select file"):
-    return filedialog.askopenfilename(
-        initialdir=os.getcwd(),
-        title=title,
-        filetypes=((f"{ext} files", f"*.{ext}"), ("all files", "*.*")),
-    )
-
-
+MMB_HEADER = 0x2000
 DISK_SIZE = 256 * 10 * 80  # Sector size, Sector Count, Track Count
 
 
@@ -85,6 +73,8 @@ def read_file_info(data, offset):
     info['load_&'] += extra_bits(extra, 2, True) << 16
     info['size'] += extra_bits(extra, 4) << 16
     info['exec_&'] += extra_bits(extra, 6, True) << 16
+
+    info['offset'] = offset + (info['start'] << 8)
     return info
 
 
@@ -98,92 +88,62 @@ def write_ssd(disk, data, disk_info):
 def read_catalogue(data):
     ''' Read the catalogue from the disk '''
     disk_info = read_disk_info(data)
-    if disk_info is None:
-        return None, None
+    if disk_info:
+        file_info = []
+        for index in range(1, disk_info['file_count'] + 1):
+            file_info.insert(index, read_file_info(data, index * 8))
+        disk_info['file_info'] = file_info
+        # print(disk_info)
+    return disk_info
+
+
+def show_catalogue(disk_info):
+    ''' Show the catalogue of and SSD '''
     print(f"{disk_info['title']} Contains {disk_info['file_count']} file(s)")
-    file_info = []
-    for index in range(1, disk_info['file_count'] + 1):
-        file_info.insert(index, read_file_info(data, index * 8))
-    for info in file_info:
+    for info in disk_info['file_info']:
         print(
             f"    {info['ext']}.{info['name']} {info['lock']} {info['load_&']:08X} {info['exec_&']:08X} {info['size']:06X} {info['start']:03X}"
         )
-    return disk_info, file_info
 
 
-def read_disk(filename, offset=0):
+def read_ssd(filename, offset=0):
     ''' Read in a DFS Disk '''
     with open(filename, "rb") as file_p:
         data = file_p.read(DISK_SIZE)
-        read_catalogue(data)
+        return read_catalogue(data)
+    return None
+
+
+def get_disk_count(filename):
+    ''' Calculate the number of disks in an MMB '''
+    size = os.path.getsize(filename)
+    if size >= MMB_HEADER:
+        size -= MMB_HEADER
+        disk_count = size // DISK_SIZE
+        if disk_count and (disk_count <= 511):
+            print(f"MMB Has {disk_count} Disks")
+            return disk_count
+    return None
 
 
 def read_mmb(filename):
     ''' Read an MMB file '''
-    with open(filename, "rb") as file_p:
-        for disk in range(256):
-            file_p.seek(0x2000 + (DISK_SIZE * disk))
-            data = file_p.read(DISK_SIZE)  # Was 0x200 now read the whole SSD in!
-            disk_info, _file_info = read_catalogue(data)
-            if disk_info:
-                write_ssd(disk, data, disk_info)
-
-def NewFile():
-    print("New File!")
-def OpenFile():
-    name = askopenfilename()
-    print(name)
-def About():
-    open_new("https://github.com/fordp2002/PyAcornDFS")
-
-def gui():
-    root = Tk()
-    root.title("Acorn DFS")
-    root.geometry("1024x768")
-    #root.iconbitmap(bitmap=os.path.join(os.path.dirname(__file__), 'Owl.ico'))
-
-    menu = Menu(root)
-    root.config(menu=menu)
-    filemenu = Menu(menu)
-    menu.add_cascade(label="File", menu=filemenu)
-    filemenu.add_command(label="Open MMB", command=OpenFile)
-    filemenu.add_command(label="New MMB", command=NewFile)
-    filemenu.add_separator()
-    filemenu.add_command(label="Open SSD", command=OpenFile)
-    filemenu.add_command(label="New SSD", command=NewFile)
-    filemenu.add_separator() 
-    filemenu.add_command(label="Exit", command=root.quit)
-
-    helpmenu = Menu(menu)
-    menu.add_cascade(label="Help", menu=helpmenu)
-    helpmenu.add_command(label="About...", command=About)
-
-    tree = Treeview(root)
-    tree["columns"] = ("serial", "firmware", "gtin")
-    tree.column("#0", width=350)
-    tree.column("serial", width=100)
-    tree.column("firmware", width=70)
-    tree.column("gtin", width=120)
-    tree.heading("serial", text="Serial #")
-    tree.heading("firmware", text="Version")
-    tree.heading("gtin", text="GTIN")
-
-    #popup = Popup(root, tree)
-    #tree.bind("<Button-3>", do_popup)
-
-    #icons = get_icons()
-    #for index, info in enumerate(devices):
-    #    add_device(index, info)
-
-    tree.pack(fill=Y, side=LEFT)
-    root.mainloop()
+    disk_count = get_disk_count(filename)
+    if disk_count:
+        with open(filename, "rb") as file_p:
+            for disk in range(disk_count):
+                file_p.seek(MMB_HEADER + (DISK_SIZE * disk))
+                data = file_p.read(DISK_SIZE)  # Was 0x200 now read the whole SSD in!
+                disk_info = read_catalogue(data)
+                if disk_info:
+                    show_catalogue(disk_info)
+                    # write_ssd(disk, data, disk_info)
 
 
-# make_disks(20)
-# pad_disk("ROMs1.ssd")
-# pad_disk("WatfordROMram.ssd")
-# read_disk(get_file())
-# read_mmb(get_file('mmb'))
-# read_mmb('BEEB.mmb')
-
-gui()
+if __name__ == "__main__":
+    # make_disks(20)
+    # pad_disk("ROMs1.ssd")
+    # pad_disk("WatfordROMram.ssd")
+    read_mmb('BEEB.mmb')
+    # disk_info, file_info = read_disk("ROMs1.ssd")
+    # show_catalogue(disk_info, file_info)
