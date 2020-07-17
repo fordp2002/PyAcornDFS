@@ -29,14 +29,9 @@ class dfs_gui(acorn_dfs):
         self.root.title("Acorn DFS")
         self.root.geometry("1024x768")
         # root.iconbitmap(bitmap=os.path.join(os.path.dirname(__file__), 'Owl.ico'))
-        # dfs = acorn_dfs("ROMs1.ssd")
-
         self.make_menu()
         self.tree = self.make_tree()
-
         # icons = get_icons()
-        # for index, info in enumerate(devices):
-        #    add_device(index, info)
         self.root.mainloop()
 
     def Open(self):
