@@ -6,7 +6,7 @@ MMB_HEADER = 0x2000
 DISK_SIZE = 256 * 10 * 80  # Sector size, Sector Count, Track Count
 
 
-def make_blank_disk(filename):
+def make_blank_ssd(filename):
     ''' Create a 200K Image '''
     data = bytearray(b'\x00') * DISK_SIZE
     pack_into('H', data, 0x106, 800)  # 80 Sectors with 10 Sectors Per Track
@@ -17,7 +17,7 @@ def make_blank_disk(filename):
 def make_disks(count):
     ''' Make DFS Disks '''
     for index in range(count):
-        make_blank_disk(f"DSKA{index:04d}.ssd")
+        make_blank_ssd(f"DSKA{index:04d}.ssd")
 
 
 def pad_disk(filename):
@@ -91,7 +91,7 @@ def read_catalogue(file_p, offset=0):
     data = file_p.read(0x200)
     disk_info = read_disk_info(data)
     if disk_info:
-        disk_info[offset] = offset
+        disk_info["offset"] = offset
         file_info = []
         for index in range(1, disk_info['file_count'] + 1):
             file_info.insert(index, read_file_info(data, index * 8))
@@ -104,7 +104,9 @@ def get_disk_count(filename):
     size = os.path.getsize(filename)
     if size >= MMB_HEADER:
         size -= MMB_HEADER
-        disk_count = size // DISK_SIZE
+        disk_count, rem = divmod(size, DISK_SIZE)
+        if rem:
+            print("MMB is oversize by {rem} bytes")
         if disk_count and (disk_count <= 511):
             return disk_count
     return None
@@ -128,11 +130,16 @@ def read_ssd(filename):
         return [read_catalogue(file_p)]
     return None
 
+
 class acorn_dfs:
     ''' Wrap the DFS Methods in a class '''
 
-    def __init__(self, filename):
+    def __init__(self, filename=None):
         ''' Open an parse the directories of a DFS File '''
+        self.open(filename)
+
+    def open(self, filename=None):
+        ''' release a file (It is not open at this point)'''
         self.filename = filename
         self.disk_info = None
         if self.filename:
@@ -141,18 +148,38 @@ class acorn_dfs:
                 self.disk_info = read_ssd(self.filename)
                 return
             if extension == '.mmb':
-                self.disk_info = read_mmb(self.filename)
+                self.disk_info = read_mmb(self.filename)               
 
-    def write_ssd(self, index):
+    def get_disk_title(self, index=0):
+        ''' Get the title of one of the disks '''
+        return self.disk_info[index]['title']
+
+    def write_ssd(self, index, filename=None):
         ''' Write SSD from an MMB '''
         if index < len(self.disk_info):
             disk = self.disk_info[index]
-        with open(self.filename, "rb") as file_p:
-            file_p.seek(disk['offset'])
-            data = file_p.read(DISK_SIZE)            
-            filename = f"DIN_{index}_{disk['title']}.ssd"
-            with open(filename, 'wb') as file_p:
-                file_p.write(data)
+            if filename is None:
+                filename = f"DIN_{index}_{disk['title']}.ssd"
+            with open(self.filename, "rb") as file_p:
+                file_p.seek(disk['offset'])
+                data = file_p.read(DISK_SIZE)
+
+                with open(filename, 'wb') as file_p:
+                    file_p.write(data)
+
+    def write_file(self, disk_index, file_index, filename=None):
+        ''' Write a file from an SSD to disk '''
+        disk = self.disk_info[disk_index]
+        info = disk['file_info'][file_index]
+        offset = disk["offset"] + (info["start"] * 256)
+        size = info["size"]
+        with open(self.filename, "rb") as read_p:
+            read_p.seek(offset)
+            data = read_p.read(size)
+            if filename == None:
+                filename = f"{info['name']}"
+            with open(filename, "wb") as write_p:
+                write_p.write(data)
 
     def show_catalogue(self, show_blank=False):
         ''' Show the catalogue(s) of file '''
