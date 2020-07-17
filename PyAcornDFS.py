@@ -85,33 +85,18 @@ def write_ssd(disk, data, disk_info):
         file_p.write(data)
 
 
-def read_catalogue(data):
+def read_catalogue(file_p, offset=0):
     ''' Read the catalogue from the disk '''
+    file_p.seek(offset)
+    data = file_p.read(0x200)
     disk_info = read_disk_info(data)
     if disk_info:
+        disk_info[offset] = offset
         file_info = []
         for index in range(1, disk_info['file_count'] + 1):
             file_info.insert(index, read_file_info(data, index * 8))
         disk_info['file_info'] = file_info
-        # print(disk_info)
     return disk_info
-
-
-def show_catalogue(disk_info):
-    ''' Show the catalogue of and SSD '''
-    print(f"{disk_info['title']} Contains {disk_info['file_count']} file(s)")
-    for info in disk_info['file_info']:
-        print(
-            f"    {info['ext']}.{info['name']} {info['lock']} {info['load_&']:08X} {info['exec_&']:08X} {info['size']:06X} {info['start']:03X}"
-        )
-
-
-def read_ssd(filename, offset=0):
-    ''' Read in a DFS Disk '''
-    with open(filename, "rb") as file_p:
-        data = file_p.read(DISK_SIZE)
-        return read_catalogue(data)
-    return None
 
 
 def get_disk_count(filename):
@@ -121,29 +106,70 @@ def get_disk_count(filename):
         size -= MMB_HEADER
         disk_count = size // DISK_SIZE
         if disk_count and (disk_count <= 511):
-            print(f"MMB Has {disk_count} Disks")
             return disk_count
     return None
 
 
 def read_mmb(filename):
     ''' Read an MMB file '''
+    disk_info = []
     disk_count = get_disk_count(filename)
     if disk_count:
         with open(filename, "rb") as file_p:
-            for disk in range(disk_count):
-                file_p.seek(MMB_HEADER + (DISK_SIZE * disk))
-                data = file_p.read(DISK_SIZE)  # Was 0x200 now read the whole SSD in!
-                disk_info = read_catalogue(data)
-                if disk_info:
-                    show_catalogue(disk_info)
-                    # write_ssd(disk, data, disk_info)
+            for index in range(disk_count):
+                offset = MMB_HEADER + (DISK_SIZE * index)
+                disk_info.append(read_catalogue(file_p, offset))
+    return disk_info
+
+
+def read_ssd(filename):
+    ''' Read in a DFS Disk '''
+    with open(filename, "rb") as file_p:
+        return [read_catalogue(file_p)]
+    return None
+
+class acorn_dfs:
+    ''' Wrap the DFS Methods in a class '''
+
+    def __init__(self, filename):
+        ''' Open an parse the directories of a DFS File '''
+        self.filename = filename
+        self.disk_info = None
+        if self.filename:
+            extension = os.path.splitext(self.filename)[1].lower()
+            if extension == '.ssd':
+                self.disk_info = read_ssd(self.filename)
+                return
+            if extension == '.mmb':
+                self.disk_info = read_mmb(self.filename)
+
+    def write_ssd(self, index):
+        ''' Write SSD from an MMB '''
+        if index < len(self.disk_info):
+            disk = self.disk_info[index]
+        with open(self.filename, "rb") as file_p:
+            file_p.seek(disk['offset'])
+            data = file_p.read(DISK_SIZE)            
+            filename = f"DIN_{index}_{disk['title']}.ssd"
+            with open(filename, 'wb') as file_p:
+                file_p.write(data)
+
+    def show_catalogue(self, show_blank=False):
+        ''' Show the catalogue(s) of file '''
+        for index, disk in enumerate(self.disk_info):
+            if disk:
+                print(f"{disk['title']} Contains {disk['file_count']} file(s)")
+                for info in disk['file_info']:
+                    print(
+                        f"    {info['ext']}.{info['name']} {info['lock']} {info['load_&']:08X} {info['exec_&']:08X} {info['size']:06X} {info['start']:03X}"
+                    )
+            elif show_blank:
+                print(f"DIN {index} is blank")
 
 
 if __name__ == "__main__":
     # make_disks(20)
     # pad_disk("ROMs1.ssd")
     # pad_disk("WatfordROMram.ssd")
-    read_mmb('BEEB.mmb')
-    # disk_info, file_info = read_disk("ROMs1.ssd")
-    # show_catalogue(disk_info, file_info)
+    acorn_dfs('BEEB.mmb').show_catalogue()
+    # acorn_dfs("ROMs1.ssd").show_catalogue()

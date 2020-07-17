@@ -4,7 +4,7 @@ from tkinter.filedialog import askopenfilename
 from tkinter.ttk import Combobox, Treeview
 from webbrowser import open_new
 
-from PyAcornDFS import read_ssd, read_mmb
+from PyAcornDFS import acorn_dfs
 
 
 def get_file(ext='ssd', title="Select file"):
@@ -62,7 +62,7 @@ def tree(root):
 
     def add_ssd(filename):
         ''' Add a device to the tree '''
-        disk = read_ssd(filename)
+        disk = acorn_dfs(filename).disk_info[0]
         if disk:
             detail = f"Contains {disk['file_count']} file(s)"
             dev = tree.insert("", "end", disk['title'], text=disk['title'], values=detail)
