@@ -136,9 +136,9 @@ class acorn_dfs:
 
     def __init__(self, filename=None):
         ''' Open an parse the directories of a DFS File '''
-        self.open(filename)
+        self.open_image(filename)
 
-    def open(self, filename=None):
+    def open_image(self, filename=None):
         ''' release a file (It is not open at this point)'''
         self.filename = filename
         self.disk_info = None
