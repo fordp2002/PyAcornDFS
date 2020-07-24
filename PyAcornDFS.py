@@ -1,6 +1,7 @@
 ''' Acorn DFS, library and GUI by Simon R. Ellwood '''
 import os
 from struct import pack_into, unpack_from
+from BBCBasicToText import Decode
 
 MMB_HEADER = 0x2000
 DISK_SIZE = 256 * 10 * 80  # Sector size, Sector Count, Track Count
@@ -61,7 +62,7 @@ def read_file_info(data, offset):
     info = {}
     name, ext = unpack_from('7sB', data, offset)
     try:
-        info['name'] = str(name, 'utf8')
+        info['name'] = str(name, 'utf8').strip()
     except:
         info['name'] = "Illegal"
     info['lock'] = 'L' if ext & 0x80 else ' '
@@ -180,6 +181,19 @@ class acorn_dfs:
                 filename = f"{info['name']}"
             with open(filename, "wb") as write_p:
                 write_p.write(data)
+
+    def extract_basic(self, disk_index, file_index, filename=None):
+        ''' Write a file from an SSD to disk '''
+        disk = self.disk_info[disk_index]
+        info = disk['file_info'][file_index]
+        offset = disk["offset"] + (info["start"] * 256)
+        with open(self.filename, "rb") as read_p:
+            read_p.seek(offset)
+            data = read_p.read(info["size"])
+            if filename == None:
+                filename = f"{info['name']}.bas"      
+            with open(filename, 'w') as write_p:
+                Decode(data, write_p)
 
     def show_catalogue(self, show_blank=False):
         ''' Show the catalogue(s) of file '''

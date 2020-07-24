@@ -32,6 +32,7 @@ class dfs_gui(acorn_dfs):
         self.make_menu()
         self.tree = self.make_tree()
         # icons = get_icons()
+        self.cursor = "wait" if os.name == 'nt' else "clock"
         self.root.mainloop()
 
     def Open(self):
@@ -55,7 +56,7 @@ class dfs_gui(acorn_dfs):
 
     def get_selection(self):
         ''' Return selected nodes '''
-        self.root.config(cursor="wait")
+        self.root.config(cursor=self.cursor)
         self.root.update()
         return self.tree.selection()
 
@@ -69,6 +70,16 @@ class dfs_gui(acorn_dfs):
             elif temp == 2:
                 self.write_file(int(index[0]), int(index[1]))
         self.root.config(cursor="")
+
+    def basic(self):
+        ''' Extract Basic '''
+        for node in self.get_selection():
+            index = node.split()
+            temp = len(index)
+            if temp == 2:
+                self.extract_basic(int(index[0]), int(index[1]))
+        self.root.config(cursor="")
+
 
     def make_menu(self):
         ''' Menu Bar '''
@@ -95,6 +106,7 @@ class dfs_gui(acorn_dfs):
         ''' Popup Menu '''
         self.popup = Menu(self.root, tearoff=0)
         self.popup.add_command(label="Save", command=self.save)
+        self.popup.add_command(label="Extract Basic", command=self.basic)
 
     def make_tree(self):
         ''' Build a Tree '''

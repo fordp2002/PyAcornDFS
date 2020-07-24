@@ -1,3 +1,5 @@
 *.ssd
 *.mmb
 *.pyc
+*.bas
+.vscode/.ropeproject
