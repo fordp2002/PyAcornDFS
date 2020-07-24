@@ -1,9 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # (c) 2007 Matt Godbolt.
 # Use however you like, as long as you put credit where credit's due.
 # Some information obtained from source code from RISC OS Open.
 # v0.01 - first release.  Doesn't deal with GOTO line numbers.
+
+# (c) 2020 Simon Ellwood.
+# 1) Convert to python 3
+# 2) Decode Embedded Line Numbers
+# 3) Handle Tokens in REM and DATA Statements
+# 4) Handle Tokens in strings
 
 import struct, re, getopt, sys
 
@@ -108,7 +114,7 @@ def Detokenise(line):
                 index += 4
                 continue
             result += tokens[data - 127]
-            if data == 0xF4:
+            if (data == 0xDC) or (data == 0xF4): # DATA and REM no further detoken
                 detoken |= 2 # To the end of the line
         else:
             result += bytearray([data])
