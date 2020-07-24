@@ -32,7 +32,7 @@ tokens = [
     b'PAGE', b'TIME', b'LOMEM', b'HIMEM', b'SOUND', b'BPUT', b'CALL', b'CHAIN',
     b'CLEAR', b'CLOSE', b'CLG', b'CLS', b'DATA', b'DEF', b'DIM', b'DRAW',
 
-    b'END', b'ENDPROC', b'ENVELOPE', b'FOR', b'GOSUB', b'GOTO', b'GCOL', b'IF',
+    b'END', b'ENDPROC', b'ENVELOPE', b'FOR', b'GOSU', b'GOTO', b'GCOL', b'IF',
     b'INPUT', b'LET', b'LOCAL', b'MODE', b'MOVE', b'NEXT', b'ON', b'VDU',
 
     b'PLOT', b'PRINT', b'PROC', b'READ', b'REM', b'REPEAT', b'REPORT', b'RESTORE',
@@ -52,7 +52,7 @@ stmtTokens= [
     b'WAIT', b'MOUSE', b'QUIT', b'SYS', b'INSTALL', b'LIBRARY', b'TINT', b'ELLIPSE',
     b'BEATS', b'TEMPO', b'VOICES', b'VOICE', b'STEREO', b'OVERLAY']
 
-def Detokenise(line):
+def DetokeniseOld(line):
     """Replace all tokens in the line 'line' with their ASCII equivalent."""
     # Internal function used as a callback to the regular expression
     # to replace tokens with their ASCII equivalents.
@@ -60,11 +60,11 @@ def Detokenise(line):
         ext, token = match.groups()
         tokenOrd = token[0] #ord(token[0])
         if ext: # An extended opcode, CASE/WHILE/SYS etc
-            if ext == b'\xc6':
+            if ext == '\xc6':
                 return cfnTokens[tokenOrd-0x8e]
-            if ext == b'\xc7':
+            if ext == '\xc7':
                 return comTokens[tokenOrd-0x8e]
-            if ext == b'\xc8':
+            if ext == '\xc8':
                 return stmtTokens[tokenOrd-0x8e]
             raise Exception("Bad token")
         else: # Normal token, plus any extra characters
@@ -76,7 +76,29 @@ def Detokenise(line):
     #     -- this ensures we don't detokenise the REM statement itself
     # OR
     # (any token)
-    return re.sub(rb'([\xc6-\xc8])?(\xf4.*|[\x7f-\xff])', ReplaceFunc, line)
+    return re.sub(r'([\xc6-\xc8])?(\xf4.*|[\x7f-\xff])', ReplaceFunc, line)
+
+def Detokenise(line):
+    """Replace all tokens in the line 'line' with their ASCII equivalent."""
+    # Internal function used as a callback to the regular expression
+    # to replace tokens with their ASCII equivalents.
+    
+    detoken = True
+    index = 0
+    size = len(line)
+    result = bytearray()
+
+    while index < size:
+        data = line[index]
+        if (data >= 0x7F) and detoken:
+            result += tokens[data - 127]
+        else:
+            result += bytearray([data])
+        if data == ord('"'):
+            detoken = not detoken
+        index += 1
+
+    return result
 
 def ReadLines(data):
     """Returns a list of [line number, tokenised line] from a binary
@@ -100,16 +122,16 @@ def Decode(data, output, use_line_numbers=True):
     """Decode binary data 'data' and write the result to 'output'."""
     lines = ReadLines(data)
     for lineNumber, line in lines:
-        lineData = f"{lineNumber} " if use_line_numbers else ""
-        lineData += str(Detokenise(line), 'utf8') #.decode('IBM437'))
-        output.write(lineData + '\n')
+        lineData = bytes(f"{lineNumber} ", encoding='utf8') if use_line_numbers else bytes()
+        lineData += Detokenise(line)
+        output.write(lineData + bytearray([13]))
 
 if __name__ == "__main__":
     optlist, args = getopt.getopt(sys.argv[1:], '')
     if len(args) != 2:
         print("Usage: %s INPUT OUTPUT" % sys.argv[0])
         sys.exit(1)
-    entireFile = open(args[0], 'rb').read()
-    output = open(args[1], 'w')
-    Decode(entireFile, output)
-    output.close()
+    with open(args[0], 'rb') as file_in:
+        entireFile = file_in.read()
+        with open(args[1], 'wb') as file_out:
+            Decode(entireFile, file_out)

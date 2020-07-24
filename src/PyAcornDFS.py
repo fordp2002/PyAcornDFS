@@ -192,7 +192,7 @@ class acorn_dfs:
             data = read_p.read(info["size"])
             if filename == None:
                 filename = f"{info['name']}.bas"      
-            with open(filename, 'w') as write_p:
+            with open(filename, 'wb') as write_p:
                 Decode(data, write_p)
 
     def show_catalogue(self, show_blank=False):
