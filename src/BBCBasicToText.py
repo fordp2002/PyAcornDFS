@@ -12,7 +12,7 @@ import struct, re, getopt, sys
 tokens = [
     b'OTHERWISE', # 7f
     b'AND', b'DIV', b'EOR', b'MOD', b'OR', b'ERROR', b'LINE', b'OFF',
-    b'STEP', b'SPC', b'TAB(', b'ELSE', b'THEN', b'<line>' # TODO
+    b'STEP', b'SPC', b'TAB(', b'ELSE', b'THEN', b'<line_number>'
         , b'OPENIN', b'PTR',
 
     b'PAGE', b'TIME', b'LOMEM', b'HIMEM', b'ABS', b'ACS', b'ADVAL', b'ASC',
@@ -32,7 +32,7 @@ tokens = [
     b'PAGE', b'TIME', b'LOMEM', b'HIMEM', b'SOUND', b'BPUT', b'CALL', b'CHAIN',
     b'CLEAR', b'CLOSE', b'CLG', b'CLS', b'DATA', b'DEF', b'DIM', b'DRAW',
 
-    b'END', b'ENDPROC', b'ENVELOPE', b'FOR', b'GOSU', b'GOTO', b'GCOL', b'IF',
+    b'END', b'ENDPROC', b'ENVELOPE', b'FOR', b'GOSUB', b'GOTO', b'GCOL', b'IF',
     b'INPUT', b'LET', b'LOCAL', b'MODE', b'MOVE', b'NEXT', b'ON', b'VDU',
 
     b'PLOT', b'PRINT', b'PROC', b'READ', b'REM', b'REPEAT', b'REPORT', b'RESTORE',
@@ -78,24 +78,42 @@ def DetokeniseOld(line):
     # (any token)
     return re.sub(r'([\xc6-\xc8])?(\xf4.*|[\x7f-\xff])', ReplaceFunc, line)
 
+def decode_line_no(data):
+    ''' Decode embeddded line numbers from GOTO and GOSUB (from BEEBASM)'''
+    if len(data) != 4:
+        raise Exception("Bad program - Line Numbers")
+
+    line_number = data[2] & 0x3F
+    line_number += (data[3] & 0x3F) << 8
+    line_number += (data[1] & 0x0C) << 12
+    line_number += (data[1] & 0x30) << 2
+    line_number ^= 0x4040
+    return bytearray(f"{line_number}", 'utf8')
+
 def Detokenise(line):
     """Replace all tokens in the line 'line' with their ASCII equivalent."""
     # Internal function used as a callback to the regular expression
     # to replace tokens with their ASCII equivalents.
     
-    detoken = True
+    detoken = 0
     index = 0
     size = len(line)
     result = bytearray()
 
     while index < size:
         data = line[index]
-        if (data >= 0x7F) and detoken:
+        if (data >= 0x7F) and (detoken == 0):
+            if data == 0x8D: # Encoded line number
+                result += decode_line_no(line[index:index + 4])
+                index += 4
+                continue
             result += tokens[data - 127]
+            if data == 0xF4:
+                detoken |= 2 # To the end of the line
         else:
             result += bytearray([data])
         if data == ord('"'):
-            detoken = not detoken
+            detoken ^= 1 # Until the next "
         index += 1
 
     return result
@@ -126,8 +144,16 @@ def Decode(data, output, use_line_numbers=True):
         lineData += Detokenise(line)
         output.write(lineData + bytearray([13]))
 
-if __name__ == "__main__":
-    optlist, args = getopt.getopt(sys.argv[1:], '')
+def test():
+    ''' Quick Test '''
+    with open("MENU", 'rb') as file_in:
+        entireFile = file_in.read()
+        with open("MENU.BAS", 'wb') as file_out:
+            Decode(entireFile, file_out)
+
+def cli():
+    ''' Run from command-line '''    
+    _optlist, args = getopt.getopt(sys.argv[1:], '')
     if len(args) != 2:
         print("Usage: %s INPUT OUTPUT" % sys.argv[0])
         sys.exit(1)
@@ -135,3 +161,7 @@ if __name__ == "__main__":
         entireFile = file_in.read()
         with open(args[1], 'wb') as file_out:
             Decode(entireFile, file_out)
+
+if __name__ == "__main__":
+    #test()
+    cli()
