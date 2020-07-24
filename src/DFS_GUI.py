@@ -26,7 +26,7 @@ class dfs_gui(acorn_dfs):
 
     def __init__(self):
         self.root = Tk()
-        self.root.title("Acorn DFS")
+        self.set_title()
         self.root.geometry("1024x768")
         # root.iconbitmap(bitmap=os.path.join(os.path.dirname(__file__), 'Owl.ico'))
         self.make_menu()
@@ -34,6 +34,12 @@ class dfs_gui(acorn_dfs):
         # icons = get_icons()
         self.cursor = "wait" if os.name == 'nt' else "clock"
         self.root.mainloop()
+
+    def set_title(self, text=""):
+        ''' Change the title '''
+        if text:
+            text += ' - '
+        self.root.title(f"{text}Acorn DFS ")
 
     def Open(self):
         ''' Get a new file to process '''
@@ -137,6 +143,7 @@ class dfs_gui(acorn_dfs):
         for child in self.tree.get_children():
             self.tree.delete(child)
         self.open_image(filename)
+        self.set_title(self.filename)
         if self.disk_info:
             for disk_index, disk in enumerate(self.disk_info):
                 if disk:
