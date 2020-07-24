@@ -79,13 +79,6 @@ def read_file_info(data, offset):
     return info
 
 
-def write_ssd(disk, data, disk_info):
-    ''' Write SSD from an MMB '''
-    filename = f"DIN_{disk}_{disk_info['title']}.ssd"
-    with open(filename, 'wb') as file_p:
-        file_p.write(data)
-
-
 def read_catalogue(file_p, offset=0):
     ''' Read the catalogue from the disk '''
     file_p.seek(offset)
@@ -147,10 +140,14 @@ class acorn_dfs:
             extension = os.path.splitext(self.filename)[1].lower()
             if extension == '.ssd':
                 self.disk_info = read_ssd(self.filename)
-                return
-            if extension == '.mmb':
-                self.disk_info = read_mmb(self.filename)               
+            elif extension == '.mmb':
+                self.disk_info = read_mmb(self.filename)
 
+    def get_default_name(self, base_name):
+        ''' Join the source directory to the filename '''
+        dir_name = os.path.dirname(self.filename)
+        return os.path.join(dir_name, base_name)
+    
     def get_disk_title(self, index=0):
         ''' Get the title of one of the disks '''
         return self.disk_info[index]['title']
@@ -160,7 +157,7 @@ class acorn_dfs:
         if index < len(self.disk_info):
             disk = self.disk_info[index]
             if filename is None:
-                filename = f"DIN_{index}_{disk['title']}.ssd"
+                filename = self.get_default_name(f"DIN_{index}_{disk['title']}.ssd")
             with open(self.filename, "rb") as file_p:
                 file_p.seek(disk['offset'])
                 data = file_p.read(DISK_SIZE)
@@ -178,7 +175,7 @@ class acorn_dfs:
             read_p.seek(offset)
             data = read_p.read(size)
             if filename == None:
-                filename = f"{info['name']}"
+                filename = self.get_default_name(info['name'])
             with open(filename, "wb") as write_p:
                 write_p.write(data)
 
@@ -191,7 +188,7 @@ class acorn_dfs:
             read_p.seek(offset)
             data = read_p.read(info["size"])
             if filename == None:
-                filename = f"{info['name']}.bas"      
+                filename = self.get_default_name(f"{info['name']}.bas")
             with open(filename, 'wb') as write_p:
                 Decode(data, write_p)
 
