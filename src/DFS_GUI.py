@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from tkinter import Tk, Menu, Button, Label, filedialog, Y, LEFT
+from tkinter import Tk, Menu, Button, Label, filedialog, Y, LEFT, Canvas
 from tkinter.filedialog import askopenfilename
 from tkinter.ttk import Combobox, Treeview
 from webbrowser import open_new
@@ -11,9 +11,9 @@ from PyAcornDFS import acorn_dfs
 def get_file(ext='ssd', title="Select file"):
     return filedialog.askopenfilename(
         initialdir=os.getcwd(),
-#        initialdir=Path.home(),
+        #        initialdir=Path.home(),
         title=title,
-        filetypes=((f"DFS files", "*.ssd *.mmb"), ("all files", "*.*")),
+        filetypes=((f"DFS files", "*.ssd *.dsd *.mmb"), ("all files", "*.*")),
     )
 
 
@@ -41,6 +41,25 @@ class dfs_gui(acorn_dfs):
             text += ' - '
         self.root.title(f"{text}Acorn DFS ")
 
+    def show_screen(self, data):
+        ''' Show Mode Zero Screen for Debug '''
+        if data:
+            height, _mod = divmod(len(data), 80)
+            if height >= 1:
+                x = 0
+                y = 0
+                self.window = Canvas(self.root, width=640, height=height)
+                self.window.pack()
+                for value in data:
+                    for offset in range(8):
+                        if value & (1 << (7 - offset)):
+                            self.window.create_line(x, y, x + 1, y)
+                            # self.window.create_rectangle((x, y) * 2)
+                        x += 1
+                    if x == 640:
+                        x = 0
+                        y += 1
+
     def Open(self):
         ''' Get a new file to process '''
         name = get_file()
@@ -65,6 +84,7 @@ class dfs_gui(acorn_dfs):
         self.root.config(cursor=self.cursor)
         self.root.update()
         return self.tree.selection()
+        #return [node.split() for node in self.tree.selection()]
 
     def save(self):
         ''' Save node(s) '''
@@ -86,6 +106,14 @@ class dfs_gui(acorn_dfs):
                 self.extract_basic(int(index[0]), int(index[1]))
         self.root.config(cursor="")
 
+    def mode_zero(self):
+        ''' Show Image '''
+        for node in self.get_selection():
+            index = node.split()
+            temp = len(index)
+            if temp == 2:
+                self.show_screen(self.get_data(int(index[0]), int(index[1])))
+        self.root.config(cursor="")
 
     def make_menu(self):
         ''' Menu Bar '''
@@ -113,6 +141,7 @@ class dfs_gui(acorn_dfs):
         self.popup = Menu(self.root, tearoff=0)
         self.popup.add_command(label="Save", command=self.save)
         self.popup.add_command(label="Extract Basic", command=self.basic)
+        self.popup.add_command(label="Mode Zero", command=self.mode_zero)
 
     def make_tree(self):
         ''' Build a Tree '''
@@ -148,7 +177,13 @@ class dfs_gui(acorn_dfs):
             for disk_index, disk in enumerate(self.disk_info):
                 if disk:
                     detail = f"Contains {disk['file_count']} file(s)"
-                    dev = self.tree.insert("", "end", [disk_index], text=f"Disk {disk_index}: {disk['title']}", values=detail)
+                    dev = self.tree.insert(
+                        "",
+                        "end",
+                        [disk_index],
+                        text=f"Disk {disk_index}: {disk['title']}",
+                        values=detail,
+                    )
                     for file_index, info in enumerate(disk['file_info']):
                         columns = (
                             f"{info['load_&']:08X}",
@@ -157,7 +192,11 @@ class dfs_gui(acorn_dfs):
                             f"{info['start']:03X}",
                         )
                         self.tree.insert(
-                            dev, "end", [disk_index, file_index], text=info['name'], values=columns
+                            dev,
+                            "end",
+                            [disk_index, file_index],
+                            text=f"{info['ext']}.{info['name']}",
+                            values=columns,
                         )
 
 
