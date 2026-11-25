@@ -1,14 +1,41 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "PyAcornDFS: Tkinter GUI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pyacorndfs",
+            "cwd": "${workspaceFolder}",
+            "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PyAcornDFS: wxPython GUI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pyacorndfs",
+            "args": ["--wx"],
+            "cwd": "${workspaceFolder}",
+            "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PyAcornDFS: run tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-v"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
+            "env": { "PYTHONPATH": "${workspaceFolder}/src" },
             "console": "integratedTerminal"
         }
     ]

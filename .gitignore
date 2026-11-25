@@ -4,3 +4,7 @@
 *.pyc
 *.bas
 .vscode/.ropeproject
+__pycache__/
+.venv/
+*.egg-info/
+build/
