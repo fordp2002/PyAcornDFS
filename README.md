@@ -1,4 +1,5 @@
 # PyAcornDFS
+
 This project is intended to support manipulating Acorn DFS .ssd, .dsd and .mmb files on a modern computer using Python 3.
 It is an open source hobby project not at all ready for production use at the time of writing!
 
@@ -10,29 +11,86 @@ The program is split into a library and two GUIs, in the `src/pyacorndfs` packag
 | `gui.py` | The Tkinter GUI |
 | `wx_gui.py` | The wxPython GUI (native widgets) |
 | `basic.py` | BBC BASIC detokeniser |
-| `disasm.py` | Adapter to the [py8dis](https://github.com/fordp2002/py8dis) disassembler |
+| `disasm.py` | Adapter to the [py8dis](https://github.com/ZornsLemma/py8dis) disassembler |
 
-## Getting the code
+## How PyAcornDFS and py8dis fit together
 
-py8dis is included as a git submodule in `external/py8dis`, so clone with:
+PyAcornDFS is the application: it owns everything Acorn-specific (disc images, the GUIs, the "Disassemble" action). [py8dis](https://github.com/ZornsLemma/py8dis) is an independent, unmodified project used as a library:
+
+- It is a git submodule in `external/py8dis`, pinned to a specific upstream commit. PyAcornDFS contains no copy of py8dis code and py8dis contains no DFS code, so each can be updated independently.
+- `src/pyacorndfs/disasm.py` is the only module that knows py8dis exists. The GUIs call `acorn_dfs.disassemble()`, which calls `disasm.disassemble()`.
+- For each file, `disasm.py` writes the raw file and a py8dis control script (`load()`, `acorn.bbc()`, `entry()`, `go()`) built from the DFS catalogue, then runs that script with `python3` in a **separate process** with `PYTHONPATH` pointing at `external/py8dis/py8dis`. py8dis keeps its state in module globals and reads the command line on import, so a fresh process per run keeps runs independent and stops a py8dis failure taking down the GUI.
+- The listing py8dis prints is saved as `NAME.6502` (BeebASM). The control script is kept as `NAME.py` so it can be refined by hand, the normal py8dis workflow.
+- py8dis is located via the `PY8DIS_PATH` environment variable if set (the directory holding `commands.py`), otherwise the submodule. If neither is present, "Disassemble" is greyed out and everything else still works.
+
+Previously the DFS code lived inside a fork of py8dis; that fork's `master` is now plain upstream and the old combined code is kept on its `dfs-experiment` branch for reference only.
+
+## Setting up on a new machine (Ubuntu)
+
+1. System packages - Python 3.10 or later with Tk, and git:
+
+   ```sh
+   sudo apt install git python3 python3-tk python3-venv
+   ```
+
+2. Clone, including the py8dis submodule:
+
+   ```sh
+   git clone --recurse-submodules https://github.com/fordp2002/PyAcornDFS
+   cd PyAcornDFS
+   ```
+
+   If you cloned without `--recurse-submodules`, run `git submodule update --init`.
+
+3. Python packages - `tkinterdnd2` (drag and drop) and `wxPython` (wx GUI); py8dis itself needs nothing extra. Either into the system Python, or into a project-local virtual environment:
+
+   ```sh
+   python3 -m venv .venv
+   . .venv/bin/activate
+   python -m pip install -r requirements.txt -r requirements-dev.txt
+   ```
+
+   pip may build wxPython from source, which is slow; `sudo apt install python3-wxgtk4.0` is a quicker alternative for the system Python.
+
+4. Check it works: `python3 -m pytest` should pass, including the disassembly tests (they are skipped if the submodule is missing).
+
+5. Optional desktop menu entry - create `~/.local/share/applications/PyAcornDFS.desktop`, using the interpreter from step 3 and your clone's path:
+
+   ```ini
+   [Desktop Entry]
+   Type=Application
+   Name=PyAcornDFS
+   Comment=Open SSD DSD and MMB Files
+   Exec=/usr/bin/python3 /path/to/PyAcornDFS/DFS_GUI.py %f
+   Path=/path/to/PyAcornDFS/
+   Icon=/path/to/PyAcornDFS/src/pyacorndfs/dfs_floppy.png
+   Terminal=false
+   Categories=Utility;X-Retro;
+   ```
+
+   `%f` passes the image when opened from Dolphin's "Open with". Use `DFS_WX_GUI.py` for the wx GUI.
+
+### Existing clones
+
+The submodule used to point at the fordp2002 fork and now points at upstream. In a clone made before that change, run once:
 
 ```sh
-git clone --recurse-submodules https://github.com/fordp2002/PyAcornDFS
+git pull
+git submodule sync
+git submodule update --init
 ```
 
-or, in an existing clone, `git submodule update --init`. Without the submodule everything works except "Disassemble", which is greyed out.
+### Updating py8dis
+
+To move to a newer upstream py8dis, then re-run the tests and commit the new pin:
+
+```sh
+git -C external/py8dis pull origin master
+python3 -m pytest
+git add external/py8dis && git commit -m "Update py8dis"
+```
 
 ## Running
-
-The GUIs need `tkinterdnd2` (drag and drop) and, for the wx version, `wxPython`. On Ubuntu the system Python can be used directly once those are installed; otherwise use a project-local virtual environment:
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-On Kubuntu, if creating the environment fails because `venv` is unavailable, install it with `sudo apt install python3-venv`.
 
 From a source checkout:
 
